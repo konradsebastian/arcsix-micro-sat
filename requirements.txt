@@ -1,0 +1,10 @@
+numpy
+pandas
+scipy
+matplotlib
+
+# Only needed for fetch_satellite_overlays.py (not for
+# compare_insitu_cloud_properties.py itself) -- also needs a patched er3t,
+# which isn't pip-installable; see ER3T_SETUP.md.
+pyhdf
+netCDF4

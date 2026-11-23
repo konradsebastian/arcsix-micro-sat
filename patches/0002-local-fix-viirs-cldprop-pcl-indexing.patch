@@ -1,0 +1,41 @@
+From 378232bc5b16eba38ee11363c4fdfd2491cc97ce Mon Sep 17 00:00:00 2001
+From: Sebastian Schmidt <sebastian.schmidt@lasp.colorado.edu>
+Date: Sat, 24 Oct 2026 05:50:33 +0000
+Subject: [PATCH] Fix viirs_cldprop_l2.read_cop() double-indexing pcl with
+ logic_extent
+
+pcl is built via np.zeros_like(cot, ...) from cot, which is already
+logic_extent-indexed a few lines up. Re-indexing the already-reduced
+pcl array with the full-resolution logic_extent mask again raises
+IndexError: too many indices for array (or a shape mismatch generally)
+against any real VIIRS CLDPROP granule. Removed the redundant
+re-indexing -- see LAGRANGE_ER3T_PATCH.md.
+---
+ er3t/util/viirs.py | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/er3t/util/viirs.py b/er3t/util/viirs.py
+index 83f77c8..0a3f6a7 100644
+--- a/er3t/util/viirs.py
++++ b/er3t/util/viirs.py
+@@ -880,7 +880,16 @@ class viirs_cldprop_l2:
+         f.close()
+         #╰────────────────────────────────────────────────────────────────────────────╯#
+ 
+-        pcl = pcl[logic_extent]
++        # BUGFIX (Schmidt lab, 2026-10-24): removed the line
++        # `pcl = pcl[logic_extent]` that was here upstream. `pcl` was
++        # already built via `np.zeros_like(cot, ...)` from `cot`, which
++        # is itself already logic_extent-indexed a few lines up -- 
++        # re-indexing the already-reduced `pcl` array with the
++        # full-resolution `logic_extent` mask again raises
++        # "IndexError: too many indices for array" (or a shape
++        # mismatch generally) against any real granule. `pcl` is
++        # already the right shape/length to match cot/cer/cwp/ctp/cth
++        # below, so this re-indexing is simply dropped.
+ 
+         # save the data
+         if hasattr(self, 'data'):
+-- 
+2.34.1
+

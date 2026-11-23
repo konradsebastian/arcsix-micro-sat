@@ -35,8 +35,8 @@ and the script runs on in-situ data alone.
 This script itself does not download or collocate the satellite data --
 that's done by the sibling script fetch_satellite_overlays.py (included
 in this repo), which writes exactly the .npz files --sat-dir above
-expects. It needs a patched er3t install and a NASA Earthdata token --
-see ER3T_SETUP.md for the one-time setup. (Unlike AVIRIS/HALO below,
+expects. It needs an er3t install (er3t's libera-l2-fixes branch) and a NASA
+Earthdata token -- see ER3T_SETUP.md for the one-time setup. (Unlike AVIRIS/HALO below,
 this piece was specifically requested, so it's included here rather
 than cut.)
 

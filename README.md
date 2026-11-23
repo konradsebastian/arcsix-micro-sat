@@ -104,13 +104,13 @@ satellite data, one to make the plot. Here's the whole thing in order.
 **Step 0 -- one-time setup (only needed if you want the satellite
 overlay; skip to Step 3 if you don't).** `pip install -r
 requirements.txt` above already covers everything else; on top of that,
-set up a patched `er3t` and a NASA Earthdata token -- this is the one
-real prerequisite in this repo, so it's broken out on its own in
-**`ER3T_SETUP.md`**. Short version: clone `er3t`, apply the two patches
-in `patches/` (`git apply`), `pip install -e .` it, generate a token at
-urs.earthdata.nasa.gov, and `export EARTHDATA_TOKEN=...` (or `setenv
-EARTHDATA_TOKEN ...` in csh/tcsh). Do this once; it's not needed again
-after the first successful fetch below.
+set up `er3t` and a NASA Earthdata token -- this is the one real
+prerequisite in this repo, so it's broken out on its own in
+**`ER3T_SETUP.md`**. Short version: `git clone -b libera-l2-fixes
+https://github.com/hong-chen/er3t.git`, `pip install -e .` it, generate
+a token at urs.earthdata.nasa.gov, and `export EARTHDATA_TOKEN=...` (or
+`setenv EARTHDATA_TOKEN ...` in csh/tcsh). Do this once; it's not
+needed again after the first successful fetch below.
 
 **Step 1 -- fetch and collocate the satellite data:**
 
@@ -170,17 +170,18 @@ satellite platform, each with `dist_w`/`cwp`/`cot`/`cth`/`satellite`
 arrays) -- Step 1 above is how you generate them, but if you already
 have them from elsewhere in the same schema, Step 1 is skippable too.
 
-**This needs a patched `er3t` install and a NASA Earthdata token --
-see `ER3T_SETUP.md` for the full recipe and `patches/` for the two
-patches themselves.** This is a real, non-trivial prerequisite (not a
-pip-installable package) -- the patches are bundled here so you don't
-need to come back and ask for them, but setting up `er3t` itself is
-still a one-time piece of work. One of the two patches isn't optional:
-without it, every VIIRS platform (SNPP/NOAA-20/NOAA-21) crashes
-outright on a real granule (a genuine upstream `IndexError`, not a
-style choice) -- MODIS (Terra/Aqua) is unaffected either way, so you
-can still get partial results with just the first patch applied if
-you're in a hurry.
+**This needs an `er3t` install and a NASA Earthdata token -- see
+`ER3T_SETUP.md` for the full recipe.** This is a real, non-trivial
+prerequisite (not a pip-installable package), but it's now just cloning
+er3t's `libera-l2-fixes` branch instead of `main` -- both upstream bugs
+that used to make this unusable (a caching bug in `download_laads_https()`,
+and a crash in VIIRS `read_cop()`) are already fixed there, maintained by
+the Libera team, so no local patching is needed. The VIIRS fix isn't
+optional in the sense that without it, every VIIRS platform
+(SNPP/NOAA-20/NOAA-21) used to crash outright on a real granule (a genuine
+upstream `IndexError`, not a style choice) -- MODIS (Terra/Aqua) was
+unaffected either way -- but since both fixes now just come from cloning
+the right branch, there's nothing left to apply selectively.
 
 AVIRIS and HALO/HSRL are intentionally not wired into either script at
 all -- see `--aviris-csv`/`--lidar-csv` below if you want to plug in

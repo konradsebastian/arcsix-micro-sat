@@ -1,48 +1,42 @@
 # er3t setup for fetch_satellite_overlays.py
 
-`fetch_satellite_overlays.py` (and the `satellite.py` it imports) needs a
-**patched** install of [er3t](https://github.com/hong-chen/er3t) and a NASA
-Earthdata token. This is the one real prerequisite that makes this piece of
-the repo more than a `pip install` -- everything else
-(`compare_insitu_cloud_properties.py` itself) only needs numpy/pandas/
-scipy/matplotlib.
+`fetch_satellite_overlays.py` (and the `satellite.py` it imports) needs
+[er3t](https://github.com/hong-chen/er3t) and a NASA Earthdata token. This
+is the one real prerequisite that makes this piece of the repo more than a
+`pip install` -- everything else (`compare_insitu_cloud_properties.py`
+itself) only needs numpy/pandas/scipy/matplotlib.
 
-## 1. Clone and patch er3t
+## 1. Clone er3t's `libera-l2-fixes` branch
 
-Two independent upstream er3t bugs need fixing before any of this works
-against real data:
+Two independent upstream er3t bugs used to make this unusable against real
+data:
 
 - **`download_laads_https()` caching bug** (`er3t/util/daac.py`): silently
-  drops a file from its *returned* list whenever that file is already
+  dropped a file from its *returned* list whenever that file was already
   cached on disk -- a caller re-running against previously-downloaded
   granules (every repeat run against the same date/track, once anything
-  is cached) sees an incomplete list back with no way to tell a genuine
+  is cached) saw an incomplete list back with no way to tell a genuine
   cache hit from a failed download.
-- **`viirs_cldprop_l2.read_cop()` crash** (`er3t/util/viirs.py`): crashes
+- **`viirs_cldprop_l2.read_cop()` crash** (`er3t/util/viirs.py`): crashed
   with `IndexError: too many indices for array` against any real VIIRS
   CLDPROP granule (SNPP/NOAA-20/NOAA-21) -- a leftover double-indexing
-  bug, not something that can be worked around from the calling side.
-  **Without this patch, every VIIRS platform will crash**, not just
-  behave oddly -- Terra/Aqua (MODIS) are unaffected.
+  bug. Terra/Aqua (MODIS) were unaffected.
+
+Both are now fixed directly on er3t's `libera-l2-fixes` branch (maintained
+by the Libera team, also used in production by `libera_cam_l2`), so no
+local patching is needed -- just clone that branch instead of `main`:
 
 ```bash
-cd ~/rtm   # or wherever you keep this kind of checkout
-git clone https://github.com/hong-chen/er3t.git er3t_arcsix
+cd ~/software   # wherever you keep clones of third-party tools/dependencies
+git clone -b libera-l2-fixes https://github.com/hong-chen/er3t.git er3t_arcsix
 cd er3t_arcsix
-git checkout -b local-cache-fix 023412d1a798cf8c8d39f2b3854dffe9b0fe26a5
-git apply /path/to/this/repo/patches/0001-local-cache-fix-download_laads_https.patch
-git apply /path/to/this/repo/patches/0002-local-fix-viirs-cldprop-pcl-indexing.patch
 pip install -e .
 ```
 
 (Run the `pip install -e .` in whichever conda/venv environment you use
-for this.) Both patches are included in this repo's `patches/` directory,
-taken as-is from Sebastian's own `arcsix_lagrange_tracking` project where
-they were first diagnosed -- see that project's `LAGRANGE_ER3T_PATCH.md`
-for the full diagnosis if you want the details, or if `er3t`'s `master`
-branch has since moved and a patch doesn't apply cleanly (check
-`git log` around the pinned commit above for anything that touches
-`daac.py` or `viirs.py`).
+for this.) If something looks off, check `git log` on that branch for
+anything that's touched `daac.py` or `viirs.py` since -- it's actively
+maintained, so later commits may have moved things further.
 
 `satellite.py` (vendored into this repo) also works around three further
 MODIS/VIIRS reader issues in er3t entirely from the calling side -- no

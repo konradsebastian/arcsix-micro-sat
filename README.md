@@ -90,7 +90,61 @@ LWC/IWC panels alongside the in-situ cloud top (implicit as the top edge
 of each leg's shaded box) -- this is the comparison Lawson specifically
 asked about (satellite vs. in-situ CTH).
 
-### Full example, with the questionable leg dropped and satellite overlay on
+`--lwp-method {naive,binned}` switches between the two LWP/IWP
+integration methods described above (`naive` is the default) -- both
+are provided so the ~15% difference between them can be checked
+directly.
+
+## Full pipeline: satellite download -> plot
+
+The comparison figure can include a satellite CTH/CWP/COT overlay, but
+getting there is two separate scripts: one to fetch+collocate the
+satellite data, one to make the plot. Here's the whole thing in order.
+
+**Step 0 -- one-time setup (only needed if you want the satellite
+overlay; skip to Step 3 if you don't).** `pip install -r
+requirements.txt` above already covers everything else; on top of that,
+set up a patched `er3t` and a NASA Earthdata token -- this is the one
+real prerequisite in this repo, so it's broken out on its own in
+**`ER3T_SETUP.md`**. Short version: clone `er3t`, apply the two patches
+in `patches/` (`git apply`), `pip install -e .` it, generate a token at
+urs.earthdata.nasa.gov, and `export EARTHDATA_TOKEN=...` (or `setenv
+EARTHDATA_TOKEN ...` in csh/tcsh). Do this once; it's not needed again
+after the first successful fetch below.
+
+**Step 1 -- fetch and collocate the satellite data:**
+
+```bash
+python3 fetch_satellite_overlays.py \
+    --p3-nav  ARCSIX-MetNav_P3B_20240607_R0.ict \
+    --date 2024-06-07 --t0 16:18:43 --t1 16:46:00 \
+    --out-dir satellite_results/
+```
+
+This finds which MODIS/VIIRS granules overpass the RF07 wall transect
+(within +-45 min by default, `--window-min` to change that), downloads
+them (cached under `satellite_cache/` so re-runs don't re-download),
+and nearest-neighbor-matches each pixel onto the P-3's own along-track
+distance. It reuses `find_candidates()`/`fetch_granule()`/
+`read_granule_point()` from `satellite.py` (vendored alongside it,
+unmodified, from Sebastian's `arcsix_lagrange_tracking` project). By
+default it tries all five platforms (`--satellites terra aqua snpp
+noaa20 noaa21` to restrict); whichever ones actually overpass the
+window write one `.npz` file each into `satellite_results/` (none is
+possible -- not every window has a usable overpass).
+
+**Step 2 -- check what came out:**
+
+```bash
+ls satellite_results/*.npz
+```
+
+If this is empty, nothing overpassed the window -- try widening
+`--window-min` or `--max-dist-km`, or confirm the time window is right.
+
+**Step 3 -- make the plot**, pointing `--sat-dir` at that same folder
+(omit `--sat-dir` entirely to skip satellite overlay and only plot the
+in-situ comparison):
 
 ```bash
 python compare_insitu_cloud_properties.py \
@@ -103,39 +157,30 @@ python compare_insitu_cloud_properties.py \
     --out comparison.png
 ```
 
-`--sat-dir` is optional: point it at a folder of `.npz` files (one per
+That's the whole pipeline: raw P-3 + satellite inputs in, one PNG out
+(`comparison.png`, or `lawson_becker_comparison_rf07.png` if `--out` is
+omitted) with the in-situ LWC/IWC/water-path/COT panels, the satellite
+CTH overlay (broken-axis, since satellite CTH is so much higher than
+the in-situ range), and the right-hand histogram column, plus the
+current run's mean LWP/IWP printed in the figure title and a per-leg
+table on stdout.
+
+`--sat-dir` itself just expects a folder of `.npz` files (one per
 satellite platform, each with `dist_w`/`cwp`/`cot`/`cth`/`satellite`
-arrays) to overlay MODIS/VIIRS alongside the in-situ data. Omit it to
-run on in-situ data alone.
-
-### Generating the satellite `.npz` files yourself
-
-`fetch_satellite_overlays.py` (new -- also in this repo) does the actual
-download/collocation step: finding which MODIS/VIIRS granules overpass
-the track, downloading them, and nearest-neighbor-matching each pixel
-onto the P-3's own along-track distance, writing out exactly the `.npz`
-schema `--sat-dir` above expects. It reuses `satellite.py` (vendored
-alongside it, unmodified, from Sebastian's `arcsix_lagrange_tracking`
-project).
-
-```bash
-EARTHDATA_TOKEN=... python3 fetch_satellite_overlays.py \
-    --p3-nav  ARCSIX-MetNav_P3B_20240607_R0.ict \
-    --date 2024-06-07 --t0 16:18:43 --t1 16:46:00 \
-    --out-dir satellite_results/
-```
+arrays) -- Step 1 above is how you generate them, but if you already
+have them from elsewhere in the same schema, Step 1 is skippable too.
 
 **This needs a patched `er3t` install and a NASA Earthdata token --
-see `ER3T_SETUP.md` for the full recipe (clone, patch, `pip install -e .`,
-token setup) and `patches/` for the two patches themselves.** This is a
-real, non-trivial prerequisite (not a pip-installable package) -- the
-patches are bundled here so you don't need to come back and ask for
-them, but setting up `er3t` itself is still a one-time piece of work.
-One of the two patches isn't optional: without it, every VIIRS platform
-(SNPP/NOAA-20/NOAA-21) crashes outright on a real granule (a genuine
-upstream `IndexError`, not a style choice) -- MODIS (Terra/Aqua) is
-unaffected either way, so you can still get partial results with just
-the first patch applied if you're in a hurry.
+see `ER3T_SETUP.md` for the full recipe and `patches/` for the two
+patches themselves.** This is a real, non-trivial prerequisite (not a
+pip-installable package) -- the patches are bundled here so you don't
+need to come back and ask for them, but setting up `er3t` itself is
+still a one-time piece of work. One of the two patches isn't optional:
+without it, every VIIRS platform (SNPP/NOAA-20/NOAA-21) crashes
+outright on a real granule (a genuine upstream `IndexError`, not a
+style choice) -- MODIS (Terra/Aqua) is unaffected either way, so you
+can still get partial results with just the first patch applied if
+you're in a hurry.
 
 AVIRIS and HALO/HSRL are intentionally not wired into either script at
 all -- see `--aviris-csv`/`--lidar-csv` below if you want to plug in
@@ -144,11 +189,6 @@ nearest-neighbor search, per-instrument file formats) is real but has
 nothing to do with the LWC/IWC/LWP/IWP/COT reconciliation this repo
 exists for, unlike the satellite step above, which Paul/Parker asked
 for directly.
-
-`--lwp-method {naive,binned}` switches between the two LWP/IWP
-integration methods described above (`naive` is the default) -- both
-are provided so the ~15% difference between them can be checked
-directly.
 
 ## Optional overlays
 
